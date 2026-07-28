@@ -7,5 +7,4 @@ services:
       - .env
     volumes:
       - ./data:/data
-      - ./credentials/service-account.json:/run/secrets/service-account.json:ro
     restart: unless-stopped

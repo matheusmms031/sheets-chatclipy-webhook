@@ -1,16 +1,35 @@
 /**
- * Instale este script vinculado à planilha (Extensões > Apps Script).
+ * Este é o `doPost` que já existe na planilha (recebe o POST do sistema
+ * externo e grava a linha). A única mudança é a chamada a
+ * `sendToWebhook_(data)` logo depois do `appendRow` — dispara o envio do
+ * template de forma síncrona ao mesmo tempo que a linha é gravada, sem
+ * depender de nenhum gatilho (onEdit/onChange/onFormSubmit), que não
+ * disparam de forma confiável quando a escrita vem de fora via API.
  *
- * Antes de usar, configure em Project Settings > Script Properties:
+ * Configure em Configurações do projeto > Propriedades do script:
  *   WEBHOOK_URL    -> URL pública do serviço (ex: https://seu-dominio/sheet-webhook)
  *   WEBHOOK_SECRET -> mesmo valor de WEBHOOK_SHARED_SECRET no .env do container
- *
- * Depois, em Triggers (relógio na lateral), adicione um gatilho instalável:
- *   Function: onFormSubmit | Event source: From spreadsheet | Event type: On form submit
- *
- * Isso dispara sempre que uma resposta do Forms cria uma linha nova.
  */
-function onFormSubmit(e) {
+function doPost(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = JSON.parse(e.postData.contents);
+  sheet.appendRow([
+    data.data_envio,
+    data.nome,
+    data.email,
+    data.whatsapp,
+    data.faturamento,
+    data.perfil,
+    data.decisao
+  ]);
+
+  sendToWebhook_(data, sheet.getLastRow());
+
+  return ContentService.createTextOutput(JSON.stringify({status: "ok"}))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function sendToWebhook_(data, rowNumber) {
   var props = PropertiesService.getScriptProperties();
   var webhookUrl = props.getProperty('WEBHOOK_URL');
   var webhookSecret = props.getProperty('WEBHOOK_SECRET');
@@ -20,12 +39,11 @@ function onFormSubmit(e) {
     return;
   }
 
-  var range = e.range;
-  var sheet = range.getSheet();
-
   var payload = {
-    sheetName: sheet.getName(),
-    row: range.getRow()
+    row: rowNumber,
+    nome: data.nome,
+    email: data.email,
+    whatsapp: data.whatsapp
   };
 
   var options = {
@@ -38,11 +56,17 @@ function onFormSubmit(e) {
     muteHttpExceptions: true
   };
 
-  var response = UrlFetchApp.fetch(webhookUrl, options);
-  Logger.log(
-    'Webhook chamado para linha %s: HTTP %s - %s',
-    range.getRow(),
-    response.getResponseCode(),
-    response.getContentText()
-  );
+  try {
+    var response = UrlFetchApp.fetch(webhookUrl, options);
+    Logger.log(
+      'Webhook chamado para linha %s: HTTP %s - %s',
+      rowNumber,
+      response.getResponseCode(),
+      response.getContentText()
+    );
+  } catch (err) {
+    // Não deixamos uma falha no webhook derrubar o doPost original —
+    // a linha já foi gravada na planilha independente disso.
+    Logger.log('Erro ao chamar o webhook: %s', err);
+  }
 }

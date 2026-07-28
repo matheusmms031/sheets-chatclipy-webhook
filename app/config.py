@@ -9,8 +9,6 @@ class Settings:
     chatclipy_whatsapp_id: int
     chatclipy_template_name: str
     chatclipy_language_code: str
-    spreadsheet_id: str
-    google_service_account_json: str
     webhook_shared_secret: str
     state_db_path: str
 
@@ -29,8 +27,6 @@ def load_settings() -> Settings:
         chatclipy_whatsapp_id=int(_require("CHATCLIPY_WHATSAPP_ID")),
         chatclipy_template_name=_require("CHATCLIPY_TEMPLATE_NAME"),
         chatclipy_language_code=os.environ.get("CHATCLIPY_LANGUAGE_CODE", "pt_BR"),
-        spreadsheet_id=_require("GOOGLE_SHEETS_SPREADSHEET_ID"),
-        google_service_account_json=_require("GOOGLE_SERVICE_ACCOUNT_JSON_PATH"),
         webhook_shared_secret=_require("WEBHOOK_SHARED_SECRET"),
         state_db_path=os.environ.get("STATE_DB_PATH", "/data/state.db"),
     )

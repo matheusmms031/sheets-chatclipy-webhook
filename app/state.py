@@ -20,8 +20,7 @@ class SentStore:
                 """
                 CREATE TABLE IF NOT EXISTS sent_templates (
                     phone TEXT PRIMARY KEY,
-                    sheet_name TEXT NOT NULL,
-                    row_number INTEGER NOT NULL,
+                    row_number TEXT,
                     message_id TEXT,
                     sent_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
@@ -38,16 +37,15 @@ class SentStore:
     def mark_sent(
         self,
         phone: str,
-        sheet_name: str,
-        row_number: int,
+        row_number: str,
         message_id: str | None,
     ) -> None:
         with self._connect() as conn:
             conn.execute(
                 """
-                INSERT INTO sent_templates (phone, sheet_name, row_number, message_id)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO sent_templates (phone, row_number, message_id)
+                VALUES (?, ?, ?)
                 ON CONFLICT(phone) DO NOTHING
                 """,
-                (phone, sheet_name, row_number, message_id),
+                (phone, row_number, message_id),
             )
