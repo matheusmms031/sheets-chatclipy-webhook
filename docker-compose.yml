@@ -1,0 +1,11 @@
+services:
+  sheet-webhook:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/data
+      - ./credentials/service-account.json:/run/secrets/service-account.json:ro
+    restart: unless-stopped
