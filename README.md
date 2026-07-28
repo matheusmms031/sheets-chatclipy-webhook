@@ -2,17 +2,19 @@
 
 Sempre que um sistema externo grava uma linha nova na planilha, dispara o
 envio de um template do WhatsApp oficial via API pública do Chatclipy
-(`POST /public-api/templates/send`), usando `Nome`, `E-mail` e `WhatsApp` da
-linha.
+(`POST /public-api/templates/send`). O nome do template e quais campos da
+linha viram parâmetros (`{{1}}`, `{{2}}`, ...) são configuráveis a qualquer
+momento pela tela `/admin`, sem precisar reiniciar o container.
 
 ## Arquitetura
 
 ```
 Sistema externo -> POST no Web App do Apps Script (função doPost já existente)
                 -> Apps Script grava a linha (appendRow) e chama o webhook
-                   com nome/email/whatsapp
+                   com nome/email/whatsapp/faturamento/perfil/decisao
                 -> serviço Python (Docker) normaliza o telefone,
-                   checa se já foi enviado
+                   checa se já foi enviado, monta os parâmetros conforme
+                   configurado em /admin
                 -> POST /public-api/templates/send no Chatclipy
 ```
 
@@ -30,10 +32,16 @@ no corpo do webhook — não precisa service account nem credenciais do Google.
 | Coluna | Conteúdo |
 |---|---|
 | A | Data de envio |
-| B | Nome -> vira `contact.name` e `parameters[0]` (`{{1}}` do template) |
-| C | E-mail -> vira `contact.email` |
-| D | WhatsApp -> vira `contact.number` (normalizado) |
-| E-G | Faturamento / Perfil / Decisão (não usados no envio) |
+| B | Nome -> vira `contact.name` (sempre) e opcionalmente parâmetro do template |
+| C | E-mail -> vira `contact.email` (sempre) e opcionalmente parâmetro do template |
+| D | WhatsApp -> vira `contact.number` (normalizado, sempre obrigatório) |
+| E | Faturamento -> disponível como parâmetro do template |
+| F | Perfil -> disponível como parâmetro do template |
+| G | Decisão -> disponível como parâmetro do template |
+
+`Nome` e `WhatsApp` são sempre obrigatórios pra disparar (linha incompleta é
+ignorada). Quais desses 6 campos entram como `parameters` do template — e em
+qual ordem — é definido na tela `/admin`, não no código.
 
 ## Setup
 
@@ -48,9 +56,12 @@ Preencha:
   Aplicações no painel do Chatclipy).
 - `CHATCLIPY_WHATSAPP_ID`: PK interna da conexão WhatsApp oficial que vai
   disparar (mesmo valor pra todas as linhas).
-- `CHATCLIPY_TEMPLATE_NAME`: nome do template aprovado na Meta.
+- `CHATCLIPY_TEMPLATE_NAME`: nome do template aprovado na Meta (valor
+  inicial — depois pode ser trocado em `/admin` sem reiniciar nada).
 - `WEBHOOK_SHARED_SECRET`: gere um valor aleatório forte (ex:
   `openssl rand -hex 32`) — vai ser o mesmo valor usado no Apps Script.
+- `ADMIN_USERNAME` / `ADMIN_PASSWORD`: credenciais de acesso à tela
+  `/admin` (HTTP Basic Auth). Gere uma senha forte.
 
 ### 2. Subir o container
 
@@ -62,10 +73,25 @@ docker compose logs -f
 O serviço expõe:
 - `GET /healthz` — checagem de saúde.
 - `POST /sheet-webhook` — chamado pelo Apps Script.
+- `GET`/`POST /admin` — tela pra trocar o nome do template e os parâmetros
+  (protegida por usuário/senha).
 
 Ele precisa estar acessível publicamente via HTTPS (o Apps Script chama de
 fora do Google), então coloque atrás do reverse proxy/ingress/domínio que
 vocês já usam.
+
+## Trocando o template e os parâmetros
+
+Acesse `https://<seu-domínio>/admin` (usuário/senha de `ADMIN_USERNAME`/
+`ADMIN_PASSWORD`). Lá dá pra:
+- Trocar o nome do template a qualquer momento.
+- Escolher quais campos (`Nome`, `E-mail`, `WhatsApp`, `Faturamento`,
+  `Perfil`, `Decisão`) preenchem `{{1}}`, `{{2}}`, ... do template, e em
+  qual ordem — adicionando ou removendo linhas de parâmetro na própria
+  página.
+
+A configuração fica salva no mesmo SQLite do estado de envio (`STATE_DB_PATH`),
+então sobrevive a reinícios do container.
 
 ### 3. Apps Script (editar o `doPost` existente)
 

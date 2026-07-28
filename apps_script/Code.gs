@@ -43,7 +43,10 @@ function sendToWebhook_(data, rowNumber) {
     row: rowNumber,
     nome: data.nome,
     email: data.email,
-    whatsapp: data.whatsapp
+    whatsapp: data.whatsapp,
+    faturamento: data.faturamento,
+    perfil: data.perfil,
+    decisao: data.decisao
   };
 
   var options = {
