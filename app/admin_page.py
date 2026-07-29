@@ -72,7 +72,7 @@ def render_admin_page(
     template_name: str, parameters: list[str], message: str = "", is_error: bool = False
 ) -> str:
     fallback_field = next(iter(AVAILABLE_FIELDS))
-    rows_html = "".join(_select_row(p) for p in parameters) or _select_row(fallback_field)
+    rows_html = "".join(_select_row(p) for p in parameters)
     message_html = ""
     if message:
         css_class = "message error" if is_error else "message"
